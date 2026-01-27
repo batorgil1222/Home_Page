@@ -1,0 +1,30 @@
+
+.home {
+  min-height: 100vh;
+  background: linear-gradient(120deg, #5c7ea6, #7faed1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 40px;
+  position: relative;
+}
+
+.logo {
+  font-size: 48px;
+  margin-bottom: 30px;
+}
+
+.icons {
+  height: 150px;
+  margin-bottom: 40px;
+}
+
+.news {
+  height: 120px;
+}
+
+.weather {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+}
