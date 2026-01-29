@@ -170,15 +170,15 @@ html, body {
 }
 
 .news-more {
-  color: #28a2ff;
+  color: #ffffff;
   font-size: 14px;
   text-decoration: none;
   font-family: 'Montserrat';
 }
 
-.news-more:hover {
+/* .news-more:hover {
   text-decoration: underline;
-}
+} */
 
 .news-section {
   display: flex;
