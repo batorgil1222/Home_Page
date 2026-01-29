@@ -17,6 +17,7 @@ export default function NewsSection() {
   const [loading, setLoading] = useState(true);
 
   const BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
+  const API_FETCH_BASE = import.meta.env.DEV ? "/api-teso" : BASE_URL;
   const NEWS_API_URL = import.meta.env.VITE_NEWS_API_URL as string;
   const NEWS_CACHE_KEY = "TESO_NEWS_CACHE_V1";
   const NEWS_TTL_MS = 15 * 60 * 1000;
@@ -59,7 +60,7 @@ export default function NewsSection() {
 
     const fetchNews = async () => {
       try {
-        const res = await axios.get(BASE_URL + NEWS_API_URL);
+        const res = await axios.get(API_FETCH_BASE + NEWS_API_URL);
         if (res.data) {
           const data = res.data;
           if (!isValidNewsResponse(data)) {
