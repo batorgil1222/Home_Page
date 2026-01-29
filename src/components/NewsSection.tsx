@@ -1,23 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cachedGet } from "../api/http";
 
 interface NewsItem {
   _id: string;
   title: string;
   createdAt: number;
-  content?: {
-    _id: string;
-    path: string;
-    type: string;
-  };
+  content?: { _id: string; path: string; type: string };
 }
 
 type TesoNewsResponse = {
-  pageProps?: {
-    articles?: {
-      articles?: NewsItem[];
-    };
-  };
+  pageProps?: { articles?: { articles?: NewsItem[] } };
 };
 
 export default function NewsSection() {
@@ -28,8 +20,14 @@ export default function NewsSection() {
   const BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
   const NEWS_API_URL = import.meta.env.VITE_NEWS_API_URL as string;
 
-  const fetchNews = async (force = false) => {
-    setLoading(true);
+  const isMounted = useRef(true);
+  const started = useRef(false);
+
+  const fetchNews = async (opts?: { force?: boolean; silent?: boolean }) => {
+    const force = opts?.force ?? false;
+    const silent = opts?.silent ?? false;
+
+    if (!silent) setLoading(true);
     setErrorMsg("");
 
     try {
@@ -40,53 +38,47 @@ export default function NewsSection() {
       });
 
       const articles = data?.pageProps?.articles?.articles ?? [];
-      setNews(articles);
+      if (isMounted.current) setNews(articles);
     } catch (err: any) {
       console.error("Мэдээ татахад алдаа:", err?.message);
-      setErrorMsg("Мэдээ татахад алдаа гарлаа.");
+      if (isMounted.current) setErrorMsg("");
     } finally {
-      setLoading(false);
+      if (!silent && isMounted.current) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchNews(false);
+    isMounted.current = true;
+
+    if (started.current) return;
+    started.current = true;
+
+    fetchNews({ force: false, silent: false });
+
+    const id = setInterval(() => {
+      fetchNews({ force: false, silent: true });
+    }, 15 * 60 * 1000);
+
+    return () => {
+      isMounted.current = false;
+      clearInterval(id);
+    };
   }, []);
 
-  if (loading) return <div className="loading">Уншиж байна...</div>;
+  if (loading) return <div className="loading"></div>;
 
   return (
     <div className="news-wrapper">
       <div className="news-header">
         <h3>Мэдээ мэдээлэл</h3>
-
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <button
-            type="button"
-            onClick={() => fetchNews(true)}
-            style={{
-              background: "transparent",
-              border: "1px solid rgba(255,255,255,0.35)",
-              color: "white",
-              padding: "6px 10px",
-              borderRadius: 10,
-              cursor: "pointer",
-              fontSize: 12,
-            }}
-            title="Cache үл тоогоод API-аас дахин татах"
-          >
-            Шинэчлэх
-          </button>
-
-          <a
-            href={`${BASE_URL}/news/all`}
-            target="_blank"
-            rel="noreferrer"
-            className="news-more"
-          >
-            Дэлгэрэнгүй &gt;
-          </a>
-        </div>
+        <a
+          href={`${BASE_URL}/news/all`}
+          target="_blank"
+          rel="noreferrer"
+          className="news-more"
+        >
+          Дэлгэрэнгүй &gt;
+        </a>
       </div>
 
       {errorMsg ? (

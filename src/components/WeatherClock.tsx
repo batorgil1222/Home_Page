@@ -5,20 +5,66 @@ export default function WeatherClock() {
   const [time, setTime] = useState(new Date());
   const [weather, setWeather] = useState<any>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const WEATHER_CACHE_KEY = "ub_weather_cache_v1";
+  const WEATHER_CACHE_TTL_MS = 60 * 60 * 1000;
 
   const boxRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const fetchWeather = async () => {
-      try {
-        const res = await axios.get(import.meta.env.VITE_WEATHER_API_URL);
-        if (res.data && res.data.current) setWeather(res.data);
-      } catch (err) {
-        console.error("Цаг агаар татахад алдаа гарлаа:", err);
+  const readCache = () => {
+    try {
+      const raw = localStorage.getItem(WEATHER_CACHE_KEY);
+      if (!raw) return null;
+
+      const parsed = JSON.parse(raw) as { ts: number; data: any };
+      if (!parsed?.ts || !parsed?.data) return null;
+
+      const age = Date.now() - parsed.ts;
+      if (age > WEATHER_CACHE_TTL_MS) return null; // хугацаа дууссан
+
+      return parsed.data;
+    } catch {
+      return null;
+    }
+  };
+
+  const writeCache = (data: any) => {
+    try {
+      localStorage.setItem(
+        WEATHER_CACHE_KEY,
+        JSON.stringify({ ts: Date.now(), data })
+      );
+    } catch {
+      // storage дүүрсэн гэх мэт үед зүгээр алгасна
+    }
+  };
+
+  const fetchWeather = async () => {
+    try {
+      const res = await axios.get(import.meta.env.VITE_WEATHER_API_URL);
+      if (res.data && res.data.current) {
+        setWeather(res.data);
+        writeCache(res.data);
       }
-    };
-    fetchWeather();
+    } catch (err) {
+      console.error("Цаг агаар татахад алдаа гарлаа:", err);
+
+      // net алдаа гарвал cache байгаа бол түүнийг ашиглаж үлдээнэ
+      const cached = readCache();
+      if (cached) setWeather(cached);
+    }
+  };
+
+    const cached = readCache();
+    if (cached) setWeather(cached);
+
+    if (!cached) fetchWeather();
+
+    const intervalId = setInterval(fetchWeather, WEATHER_CACHE_TTL_MS);
+
+    return () => clearInterval(intervalId);
   }, []);
+
 
   useEffect(() => {
     const id = setInterval(() => setTime(new Date()), 1000);
@@ -52,58 +98,80 @@ export default function WeatherClock() {
 
   const getWeatherInfo = (code: number) => {
     switch (code) {
-        case 0:
+      case 0:
         return { icon: "☀️", text: "Цэлмэг" };
 
-        case 1:
+      case 1:
         return { icon: "🌤️", text: "Ихэнхдээ цэлмэг" };
 
-        case 2:
+      case 2:
         return { icon: "⛅", text: "Багавтар үүлтэй" };
 
-        case 3:
+      case 3:
         return { icon: "☁️", text: "Үүлэрхэг" };
 
-        case 45:
-        case 48:
+      case 45:
+      case 48:
         return { icon: "🌫️", text: "Манантай" };
 
-        case 51:
-        case 53:
-        case 55:
+      case 51:
+      case 53:
+      case 55:
         return { icon: "🌦️", text: "Шиврээ бороо" };
 
-        case 61:
-        case 63:
-        case 65:
+      case 61:
+      case 63:
+      case 65:
         return { icon: "🌧️", text: "Бороотой" };
 
-        case 71:
-        case 73:
-        case 75:
-        case 77:
+      case 71:
+      case 73:
+      case 75:
+      case 77:
         return { icon: "❄️", text: "Цастай" };
 
-        case 80:
-        case 81:
-        case 82:
+      case 80:
+      case 81:
+      case 82:
         return { icon: "🌧️", text: "Аадар" };
 
-        case 95:
-        case 96:
-        case 99:
+      case 95:
+      case 96:
+      case 99:
         return { icon: "⛈️", text: "Аянгатай" };
 
-        default:
+      default:
         return { icon: "🌡️", text: "Тодорхойгүй" };
     }
+  };
+
+  const getNext7HourlyForecast = () => {
+  if (!weather?.hourly?.time?.length) return [];
+
+  const now = new Date();
+  const times: string[] = weather.hourly.time;
+  const temps: number[] = weather.hourly.temperature_2m ?? [];
+  const codes: number[] = weather.hourly.weather_code ?? [];
+
+  let startIndex = times.findIndex(
+    (t) => new Date(t).getTime() >= now.getTime()
+  );
+  if (startIndex === -1) startIndex = 0;
+
+  // ✅ 1 цагийн зайтай 7 ширхэг
+  return Array.from({ length: 7 }, (_, i) => {
+    const idx = startIndex + i;  
+
+    if (idx >= times.length) return null;
+
+    return {
+      time: times[idx],
+      temp: temps[idx],
+      code: codes[idx],
+    };
+  }).filter(Boolean) as Array<{ time: string; temp: number; code: number }>;
 };
 
-
-  const getDayName = (dateStr: string) => {
-    const days = ["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Би"];
-    return days[new Date(dateStr).getDay()];
-  };
 
   const currentInfo = weather
     ? getWeatherInfo(weather.current.weather_code)
@@ -118,37 +186,43 @@ export default function WeatherClock() {
         setIsExpanded((v) => !v);
       }}
     >
-      {/* MINI - always */}
-      <div className="weather-summary-mini">
-        <span className="temp-main">
-          {weather?.current ? `${Math.round(weather.current.temperature_2m)}°` : "..."}
-        </span>
-        <span className="weather-status-text">{currentInfo.text}</span>
-      </div>
-
-      {/* DETAILS - always */}
-      <div className="weather-full-details" onClick={(e) => e.stopPropagation()}>
-        <div className="weather-header-row">
-          <span className="date-txt">{time.toLocaleDateString("fr-CA")}</span>
-          <span className="loc-txt">📍 Улаанбаатар</span>
-          <span className="temp-txt">
-            {currentInfo.icon} {Math.round(weather?.current?.temperature_2m ?? 0)}°
+      {!isExpanded && (
+        <div className="weather-summary-mini">
+          <span className="temp-main">
+            {weather?.current ? `${Math.round(weather.current.temperature_2m)}°` : "..."}
           </span>
+          <span className="weather-status-text">{currentInfo.text}</span>
         </div>
+      )}
 
-        <div className="divider"></div>
-        <div className="forecast-label">Ирэх өдрүүдийн төлөв</div>
+      {isExpanded && (
+        <div className="weather-full-details" onClick={(e) => e.stopPropagation()}>
+          <div className="weather-header-row">
+            <span className="date-txt">{time.toLocaleDateString("fr-CA")}</span>
+            <span className="loc-txt">📍 Улаанбаатар</span>
+            <span className="temp-txt">
+              {currentInfo.icon} {Math.round(weather?.current?.temperature_2m ?? 0)}°
+            </span>
+          </div>
 
-        <div className="forecast-grid">
-          {weather?.daily?.time?.map((day: string, index: number) => (
-            <div key={day} className="forecast-item">
-              <span>{getDayName(day)}</span>
-              <span>{getWeatherInfo(weather.daily.weather_code[index]).icon}</span>
-              <b>{Math.round(weather.daily.temperature_2m_max[index])}°</b>
-            </div>
-          ))}
+          <div className="divider"></div>
+
+          <div className="forecast-grid">
+            {getNext7HourlyForecast().map((item, index) => {
+              const info = getWeatherInfo(item.code);
+              const dt = new Date(item.time);
+              const hh = String(dt.getHours()).padStart(2, "0");
+              return (
+                <div key={index} className="forecast-item">
+                  <span>{hh}:00</span>
+                  <span>{info.icon}</span>
+                  <b>{Math.round(item.temp)}°</b>
+                </div>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

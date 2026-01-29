@@ -7,8 +7,8 @@ import WeatherClock from "../components/WeatherClock";
 export default function Home() {
     return (
         <div className="home">
+            <Logo />
             <div className="center-panel">
-                <Logo />
                 <AppIcons />
             </div>
             <NewsSection />
