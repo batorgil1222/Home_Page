@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 
-const API_URL =
-  "https://core-api.teso.mn:8088/api/homePage/systemList?active=1";
-
-const IMAGE_BASE = "https://core-api.teso.mn:8088/"; 
+const API_URL = import.meta.env.VITE_APP_CORE_API_URL as string;
+const IMAGE_BASE = import.meta.env.VITE_APP_CORE_IMAGE_BASE as string;
 
 type SystemItem = {
   ID: number;
@@ -44,7 +42,7 @@ export default function AppIcons() {
     fetchSystems();
   }, []);
 
-  if (loading) return <div></div>;
+  if (loading) return <div />;
 
   return (
     <div className="app-icons">
