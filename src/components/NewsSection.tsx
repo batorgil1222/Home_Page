@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { cachedGet } from "../api/http";
-import { cacheGet } from "../utils/apiCache";
+import { http } from "../api/http";
+import { cacheGet, cacheRemove, cacheSet } from "../utils/apiCache";
 
 interface NewsItem {
   _id: string;
@@ -23,6 +23,13 @@ export default function NewsSection() {
   const NEWS_CACHE_KEY = "TESO_NEWS_CACHE_V1";
   const NEWS_TTL_MS = 15 * 60 * 1000;
 
+  const isValidNewsResponse = (value: unknown): value is TesoNewsResponse => {
+    if (!value || typeof value !== "object") return false;
+    const v = value as TesoNewsResponse;
+    const articles = v?.pageProps?.articles?.articles;
+    return Array.isArray(articles);
+  };
+
   const isMounted = useRef(true);
   const started = useRef(false);
 
@@ -35,17 +42,21 @@ export default function NewsSection() {
 
     try {
       const cached = !force ? cacheGet<TesoNewsResponse>(NEWS_CACHE_KEY, NEWS_TTL_MS) : null;
-      if (cached) {
+      if (cached && isValidNewsResponse(cached)) {
         const cachedArticles = cached?.pageProps?.articles?.articles ?? [];
         if (isMounted.current) setNews(cachedArticles);
         return;
       }
+      if (cached && !isValidNewsResponse(cached)) {
+        cacheRemove(NEWS_CACHE_KEY);
+      }
 
-      const data = await cachedGet<TesoNewsResponse>(NEWS_API_URL, {
-        ttlMs: NEWS_TTL_MS,
-        force: true,
-        cacheKey: NEWS_CACHE_KEY,
-      });
+      const res = await http.get<TesoNewsResponse>(NEWS_API_URL);
+      const data = res.data;
+      if (!isValidNewsResponse(data)) {
+        throw new Error("Invalid news response");
+      }
+      cacheSet<TesoNewsResponse>(NEWS_CACHE_KEY, data);
 
       const articles = data?.pageProps?.articles?.articles ?? [];
       if (isMounted.current) setNews(articles);
