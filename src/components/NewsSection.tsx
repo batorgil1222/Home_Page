@@ -1,6 +1,5 @@
+import axios from "axios";
 import { useEffect, useState } from "react";
-import { http } from "../api/http";
-import { cacheGet, cacheRemove, cacheSet } from "../utils/apiCache";
 
 interface NewsItem {
   _id: string;
@@ -16,7 +15,6 @@ type TesoNewsResponse = {
 export default function NewsSection() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState("");
 
   const BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
   const NEWS_API_URL = import.meta.env.VITE_NEWS_API_URL as string;
@@ -31,42 +29,71 @@ export default function NewsSection() {
   };
 
   useEffect(() => {
-    const fetchNews = async () => {
-      setErrorMsg("");
-
-      const cached = cacheGet<TesoNewsResponse>(NEWS_CACHE_KEY, NEWS_TTL_MS);
-      if (cached && isValidNewsResponse(cached)) {
-        const cachedArticles = cached?.pageProps?.articles?.articles ?? [];
-        setNews(cachedArticles);
-        setLoading(false);
-        return;
-      }
-      if (cached && !isValidNewsResponse(cached)) {
-        cacheRemove(NEWS_CACHE_KEY);
-      }
-
+    const readCache = () => {
       try {
-        const res = await http.get<TesoNewsResponse>(NEWS_API_URL);
-        const data = res.data;
-        if (!isValidNewsResponse(data)) {
-          throw new Error("Invalid news response");
+        const raw = localStorage.getItem(NEWS_CACHE_KEY);
+        if (!raw) return null;
+
+        const parsed = JSON.parse(raw) as { ts: number; data: any };
+        if (!parsed?.ts || !parsed?.data) return null;
+
+        const age = Date.now() - parsed.ts;
+        if (age > NEWS_TTL_MS) return null;
+
+        return parsed.data;
+      } catch {
+        return null;
+      }
+    };
+
+    const writeCache = (data: any) => {
+      try {
+        localStorage.setItem(
+          NEWS_CACHE_KEY,
+          JSON.stringify({ ts: Date.now(), data })
+        );
+      } catch {
+        // no-op
+      }
+    };
+
+    const fetchNews = async () => {
+      try {
+        const res = await axios.get(BASE_URL + NEWS_API_URL);
+        if (res.data) {
+          const data = res.data;
+          if (!isValidNewsResponse(data)) {
+            throw new Error("Invalid news response");
+          }
+          const articles = data?.pageProps?.articles?.articles ?? [];
+          setNews(articles);
+          writeCache(res.data);
         }
-        cacheSet<TesoNewsResponse>(NEWS_CACHE_KEY, data);
-        const articles = data?.pageProps?.articles?.articles ?? [];
-        setNews(articles);
-      } catch (err: any) {
-        console.error("Мэдээ татахад алдаа:", err?.message);
-        setErrorMsg("");
+      } catch (err) {
+        console.error("мэдээлэл татахад алдаа гарлаа:", err);
+        const cached = readCache();
+        if (cached && isValidNewsResponse(cached)) {
+          const cachedArticles = cached?.pageProps?.articles?.articles ?? [];
+          setNews(cachedArticles);
+        }
       } finally {
         setLoading(false);
       }
     };
 
-    fetchNews();
+    const cached = readCache();
+    if (cached && isValidNewsResponse(cached)) {
+      const cachedArticles = cached?.pageProps?.articles?.articles ?? [];
+      setNews(cachedArticles);
+      setLoading(false);
+    }
 
-    const id = setInterval(fetchNews, NEWS_TTL_MS);
-    return () => clearInterval(id);
-  }, [NEWS_API_URL]);
+    if (!cached) fetchNews();
+
+    const intervalId = setInterval(fetchNews, NEWS_TTL_MS);
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   if (loading) return <div className="loading"></div>;
 
@@ -83,12 +110,6 @@ export default function NewsSection() {
           Дэлгэрэнгүй &gt;
         </a>
       </div>
-
-      {errorMsg ? (
-        <div style={{ color: "rgba(255,255,255,0.85)", fontSize: 12, marginBottom: 8 }}>
-          {errorMsg}
-        </div>
-      ) : null}
 
       <div className="news-section">
         {news.map((n, i) => {
