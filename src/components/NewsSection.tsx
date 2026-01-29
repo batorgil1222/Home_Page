@@ -17,7 +17,7 @@ export default function NewsSection() {
   const [loading, setLoading] = useState(true);
 
   const BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
-  const API_FETCH_BASE = import.meta.env.DEV ? "/api-teso" : BASE_URL;
+  const API_FETCH_BASE = "/api-teso";
   const NEWS_API_URL = import.meta.env.VITE_NEWS_API_URL as string;
   const NEWS_CACHE_KEY = "TESO_NEWS_CACHE_V1";
   const NEWS_TTL_MS = 15 * 60 * 1000;
@@ -135,7 +135,7 @@ export default function NewsSection() {
                   alt={n.title}
                   className="news-image"
                   loading="lazy"
-                  onError={(e) => {
+                  onError={e => {
                     (e.currentTarget as HTMLImageElement).src =
                       "https://via.placeholder.com/300x200";
                   }}
@@ -143,9 +143,13 @@ export default function NewsSection() {
               </div>
 
               <div className="news-content">
-                <h4 style={{ textDecoration: "none", color: "white" }}>{n.title}</h4>
+                <h4 style={{ textDecoration: "none", color: "white" }}>
+                  {n.title}
+                </h4>
                 <span className="news-date">
-                  {n.createdAt ? new Date(n.createdAt).toLocaleDateString("mn-MN") : "Огноогүй"}
+                  {n.createdAt
+                    ? new Date(n.createdAt).toLocaleDateString("mn-MN")
+                    : "Огноогүй"}
                 </span>
               </div>
             </a>
