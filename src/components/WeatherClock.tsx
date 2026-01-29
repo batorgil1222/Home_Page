@@ -20,7 +20,7 @@ export default function WeatherClock() {
       if (!parsed?.ts || !parsed?.data) return null;
 
       const age = Date.now() - parsed.ts;
-      if (age > WEATHER_CACHE_TTL_MS) return null; // хугацаа дууссан
+      if (age > WEATHER_CACHE_TTL_MS) return null; 
 
       return parsed.data;
     } catch {
@@ -35,7 +35,7 @@ export default function WeatherClock() {
         JSON.stringify({ ts: Date.now(), data })
       );
     } catch {
-      // storage дүүрсэн гэх мэт үед зүгээр алгасна
+      
     }
   };
 
@@ -48,8 +48,6 @@ export default function WeatherClock() {
       }
     } catch (err) {
       console.error("Цаг агаар татахад алдаа гарлаа:", err);
-
-      // net алдаа гарвал cache байгаа бол түүнийг ашиглаж үлдээнэ
       const cached = readCache();
       if (cached) setWeather(cached);
     }
