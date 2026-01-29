@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cachedGet } from "../api/http";
+import { cacheGet } from "../utils/apiCache";
 
 interface NewsItem {
   _id: string;
@@ -19,6 +20,8 @@ export default function NewsSection() {
 
   const BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
   const NEWS_API_URL = import.meta.env.VITE_NEWS_API_URL as string;
+  const NEWS_CACHE_KEY = "TESO_NEWS_CACHE_V1";
+  const NEWS_TTL_MS = 15 * 60 * 1000;
 
   const isMounted = useRef(true);
   const started = useRef(false);
@@ -31,10 +34,17 @@ export default function NewsSection() {
     setErrorMsg("");
 
     try {
+      const cached = !force ? cacheGet<TesoNewsResponse>(NEWS_CACHE_KEY, NEWS_TTL_MS) : null;
+      if (cached) {
+        const cachedArticles = cached?.pageProps?.articles?.articles ?? [];
+        if (isMounted.current) setNews(cachedArticles);
+        return;
+      }
+
       const data = await cachedGet<TesoNewsResponse>(NEWS_API_URL, {
-        ttlMs: 15 * 60 * 1000,
-        force,
-        cacheKey: "TESO_NEWS_CACHE_V1",
+        ttlMs: NEWS_TTL_MS,
+        force: true,
+        cacheKey: NEWS_CACHE_KEY,
       });
 
       const articles = data?.pageProps?.articles?.articles ?? [];
