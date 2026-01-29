@@ -102,12 +102,12 @@ html, body {
 }
 
 .app-icon img {
-  width: 35px; 
-  height: 35px;
+  width: 60px; 
+  height: 60px;
   border-radius: 50%;
   background: white;
-  padding: 8px;
-  object-fit: contain;
+  padding: 0;
+  object-fit: fill;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   margin-bottom: 8px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
