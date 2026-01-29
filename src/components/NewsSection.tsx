@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { http } from "../api/http";
 import { cacheGet, cacheRemove, cacheSet } from "../utils/apiCache";
 
@@ -30,61 +30,43 @@ export default function NewsSection() {
     return Array.isArray(articles);
   };
 
-  const isMounted = useRef(true);
-  const started = useRef(false);
+  useEffect(() => {
+    const fetchNews = async () => {
+      setErrorMsg("");
 
-  const fetchNews = async (opts?: { force?: boolean; silent?: boolean }) => {
-    const force = opts?.force ?? false;
-    const silent = opts?.silent ?? false;
-
-    if (!silent) setLoading(true);
-    setErrorMsg("");
-
-    try {
-      const cached = !force ? cacheGet<TesoNewsResponse>(NEWS_CACHE_KEY, NEWS_TTL_MS) : null;
+      const cached = cacheGet<TesoNewsResponse>(NEWS_CACHE_KEY, NEWS_TTL_MS);
       if (cached && isValidNewsResponse(cached)) {
         const cachedArticles = cached?.pageProps?.articles?.articles ?? [];
-        if (isMounted.current) setNews(cachedArticles);
+        setNews(cachedArticles);
+        setLoading(false);
         return;
       }
       if (cached && !isValidNewsResponse(cached)) {
         cacheRemove(NEWS_CACHE_KEY);
       }
 
-      const res = await http.get<TesoNewsResponse>(NEWS_API_URL);
-      const data = res.data;
-      if (!isValidNewsResponse(data)) {
-        throw new Error("Invalid news response");
+      try {
+        const res = await http.get<TesoNewsResponse>(NEWS_API_URL);
+        const data = res.data;
+        if (!isValidNewsResponse(data)) {
+          throw new Error("Invalid news response");
+        }
+        cacheSet<TesoNewsResponse>(NEWS_CACHE_KEY, data);
+        const articles = data?.pageProps?.articles?.articles ?? [];
+        setNews(articles);
+      } catch (err: any) {
+        console.error("Мэдээ татахад алдаа:", err?.message);
+        setErrorMsg("");
+      } finally {
+        setLoading(false);
       }
-      cacheSet<TesoNewsResponse>(NEWS_CACHE_KEY, data);
-
-      const articles = data?.pageProps?.articles?.articles ?? [];
-      if (isMounted.current) setNews(articles);
-    } catch (err: any) {
-      console.error("Мэдээ татахад алдаа:", err?.message);
-      if (isMounted.current) setErrorMsg("");
-    } finally {
-      if (!silent && isMounted.current) setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    isMounted.current = true;
-
-    if (started.current) return;
-    started.current = true;
-
-    fetchNews({ force: false, silent: false });
-
-    const id = setInterval(() => {
-      fetchNews({ force: false, silent: true });
-    }, 15 * 60 * 1000);
-
-    return () => {
-      isMounted.current = false;
-      clearInterval(id);
     };
-  }, []);
+
+    fetchNews();
+
+    const id = setInterval(fetchNews, NEWS_TTL_MS);
+    return () => clearInterval(id);
+  }, [NEWS_API_URL]);
 
   if (loading) return <div className="loading"></div>;
 
