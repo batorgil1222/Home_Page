@@ -29,7 +29,7 @@ html, body {
 .logo {
   max-width: 100%;
   height: auto;
-  width: 350px;   
+  width: 280px;   
   user-select: none;
   opacity: 0.9;
 }
@@ -144,8 +144,9 @@ html, body {
 }
 
 .news-wrapper {
-  width: 80%;
-  max-width: 1200px;
+  width: min(92vw, 1400px);
+  max-width: 1450px;
+  padding-top: 5%;
 }
 
 .news-title {
