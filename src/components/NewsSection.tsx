@@ -2,14 +2,21 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 
 interface NewsItem {
-  _id: string;
+  id: number;
   title: string;
-  createdAt: number;
-  content?: { _id: string; path: string; type: string };
+  imagePath: string | null;
+  date: string;
 }
 
 type TesoNewsResponse = {
-  pageProps?: { articles?: { articles?: NewsItem[] } };
+  status?: string;
+  result?: Array<{
+    id: number;
+    TITLE?: string;
+    IMAGE_PATH?: string | null;
+    THUMBNAIL_PATH?: string | null;
+    DATE?: string;
+  }>;
 };
 
 export default function NewsSection() {
@@ -17,16 +24,14 @@ export default function NewsSection() {
   const [loading, setLoading] = useState(true);
 
   const BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
-  const API_FETCH_BASE = "/api-teso";
-  const NEWS_API_URL = import.meta.env.VITE_NEWS_API_URL as string;
+  const NEWS_API_URL = "https://site-api.teso.mn/api/newnews?limit=10";
   const NEWS_CACHE_KEY = "TESO_NEWS_CACHE_V1";
   const NEWS_TTL_MS = 15 * 60 * 1000;
 
   const isValidNewsResponse = (value: unknown): value is TesoNewsResponse => {
     if (!value || typeof value !== "object") return false;
     const v = value as TesoNewsResponse;
-    const articles = v?.pageProps?.articles?.articles;
-    return Array.isArray(articles);
+    return Array.isArray(v?.result);
   };
 
   useEffect(() => {
@@ -35,7 +40,10 @@ export default function NewsSection() {
         const raw = localStorage.getItem(NEWS_CACHE_KEY);
         if (!raw) return null;
 
-        const parsed = JSON.parse(raw) as { ts: number; data: any };
+        const parsed = JSON.parse(raw) as {
+          ts: number;
+          data: NewsItem[] | null;
+        };
         if (!parsed?.ts || !parsed?.data) return null;
 
         const age = Date.now() - parsed.ts;
@@ -47,7 +55,7 @@ export default function NewsSection() {
       }
     };
 
-    const writeCache = (data: any) => {
+    const writeCache = (data: NewsItem[] | null) => {
       try {
         localStorage.setItem(
           NEWS_CACHE_KEY,
@@ -60,32 +68,37 @@ export default function NewsSection() {
 
     const fetchNews = async () => {
       try {
-        const res = await axios.get(API_FETCH_BASE + NEWS_API_URL);
+        const res = await axios.get(NEWS_API_URL);
         if (res.data) {
           const data = res.data;
           if (!isValidNewsResponse(data)) {
             throw new Error("Invalid news response");
           }
-          const articles = data?.pageProps?.articles?.articles ?? [];
+
+          const articles: NewsItem[] = (data.result ?? []).map(item => {
+            return {
+              id: item.id,
+              title: item.TITLE || "",
+              imagePath: item.THUMBNAIL_PATH || item.IMAGE_PATH || null,
+              date: item.DATE || "",
+            };
+          });
+
           setNews(articles);
-          writeCache(res.data);
+          writeCache(articles);
         }
       } catch (err) {
-        console.error("мэдээлэл татахад алдаа гарлаа:", err);
+        console.error("Failed to fetch news:", err);
         const cached = readCache();
-        if (cached && isValidNewsResponse(cached)) {
-          const cachedArticles = cached?.pageProps?.articles?.articles ?? [];
-          setNews(cachedArticles);
-        }
+        if (cached) setNews(cached);
       } finally {
         setLoading(false);
       }
     };
 
     const cached = readCache();
-    if (cached && isValidNewsResponse(cached)) {
-      const cachedArticles = cached?.pageProps?.articles?.articles ?? [];
-      setNews(cachedArticles);
+    if (cached) {
+      setNews(cached);
       setLoading(false);
     }
 
@@ -114,15 +127,15 @@ export default function NewsSection() {
 
       <div className="news-section">
         {news.map((n, i) => {
-          const imageUrl = n.content?.path
-            ? `${BASE_URL}/images/${n.content.path}`
+          const imageUrl = n.imagePath
+            ? `https://site-api.teso.mn${n.imagePath}`
             : "https://via.placeholder.com/300x200";
 
-          const newsLink = `${BASE_URL}/news/all/article/${n._id}`;
+          const newsLink = `${BASE_URL}/news/${n.id}`;
 
           return (
             <a
-              key={n._id || i}
+              key={n.id || i}
               href={newsLink}
               target="_blank"
               rel="noopener noreferrer"
@@ -132,7 +145,7 @@ export default function NewsSection() {
               <div className="news-image-wrapper">
                 <img
                   src={imageUrl}
-                  alt={n.title}
+                  alt={n.title || "news"}
                   className="news-image"
                   loading="lazy"
                   onError={e => {
@@ -147,8 +160,8 @@ export default function NewsSection() {
                   {n.title}
                 </h4>
                 <span className="news-date">
-                  {n.createdAt
-                    ? new Date(n.createdAt).toLocaleDateString("mn-MN")
+                  {n.date
+                    ? new Date(n.date).toLocaleDateString("mn-MN")
                     : "Огноогүй"}
                 </span>
               </div>
